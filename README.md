@@ -1,0 +1,1 @@
+# kugenuma-beach-forecast
