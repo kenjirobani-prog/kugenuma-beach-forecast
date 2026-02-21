@@ -1,7 +1,4 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import type { ForecastResponse, DayForecast, ForecastEntry } from "./api/forecast/route";
+import { fetchForecast, type DayForecast, type ForecastEntry } from "@/lib/forecast";
 
 function fmt(value: number | null | undefined, decimals = 1): string {
   if (value === null || value === undefined) return "—";
@@ -99,26 +96,18 @@ function DayCard({ day }: { day: DayForecast }) {
   );
 }
 
-export default function Home() {
-  const [forecast, setForecast] = useState<ForecastResponse | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export default async function Home() {
+  let fetchedAt: string | null = null;
+  let days: DayForecast[] = [];
+  let error: string | null = null;
 
-  useEffect(() => {
-    fetch("/api/forecast")
-      .then(async (res) => {
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
-          throw new Error(body.error ?? `HTTP ${res.status}`);
-        }
-        return res.json() as Promise<ForecastResponse>;
-      })
-      .then((data) => setForecast(data))
-      .catch((err: unknown) => {
-        setError(err instanceof Error ? err.message : "Failed to load forecast");
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  try {
+    const data = await fetchForecast();
+    days = data.days;
+    fetchedAt = data.fetchedAt;
+  } catch (err) {
+    error = err instanceof Error ? err.message : "Failed to load forecast";
+  }
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8">
@@ -128,10 +117,10 @@ export default function Home() {
         <p className="text-slate-500 text-sm">
           Fujisawa, Kanagawa, Japan &mdash; 35.3089°N 139.4909°E
         </p>
-        {forecast && (
+        {fetchedAt && (
           <p className="text-slate-400 text-xs mt-1">
             Fetched:{" "}
-            {new Date(forecast.fetchedAt).toLocaleString("ja-JP", {
+            {new Date(fetchedAt).toLocaleString("ja-JP", {
               timeZone: "Asia/Tokyo",
               dateStyle: "short",
               timeStyle: "medium",
@@ -141,16 +130,8 @@ export default function Home() {
         )}
       </div>
 
-      {/* Loading state */}
-      {loading && (
-        <div className="text-center py-20 text-slate-400">
-          <div className="inline-block w-8 h-8 border-4 border-blue-300 border-t-blue-600 rounded-full animate-spin mb-4" />
-          <p>Loading forecast&hellip;</p>
-        </div>
-      )}
-
       {/* Error state */}
-      {!loading && error && (
+      {error && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-8 text-center">
           <div className="text-red-400 text-5xl mb-4">⚠</div>
           <h2 className="text-red-700 font-semibold text-lg mb-2">Could not load forecast</h2>
@@ -159,23 +140,15 @@ export default function Home() {
             Data is fetched from{" "}
             <span className="font-mono">marine-api.open-meteo.com</span>. Please try again later.
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-4 px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
-          >
-            Retry
-          </button>
         </div>
       )}
 
       {/* Forecast days */}
-      {!loading && forecast && (
+      {days.length > 0 && (
         <div className="space-y-6">
-          {forecast.days.length === 0 ? (
-            <p className="text-slate-500 text-center py-12">No forecast data available.</p>
-          ) : (
-            forecast.days.map((day) => <DayCard key={day.date} day={day} />)
-          )}
+          {days.map((day) => (
+            <DayCard key={day.date} day={day} />
+          ))}
         </div>
       )}
 
